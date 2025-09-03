@@ -1,50 +1,50 @@
-# Raspberry Pi: Pi-hole + ProtonVPN Gateway
+# Raspberry Pi: Pi-hole + NordVPN Gateway (v2.0)
 
-> 🇳🇴 Norsk · 🇬🇧 English version
+> 🇬🇧 English · 🇳🇴 [Norwegian version](README.md)
 
-This project sets up a Raspberry Pi as a combined DNS filtering server (Pi-hole) and an advanced VPN gateway. The solution uses the universal OpenVPN client, is tested with **Proton VPN (free version)**, and has functionality for **selective routing**, which allows you to send traffic from only selected devices and/or ports through the VPN tunnel.
+This project configures a Raspberry Pi as a combined DNS filtering server (Pi-hole) and an advanced NordVPN gateway. The solution uses the official NordVPN client with the NordLynx protocol and features **selective routing**, allowing you to send traffic from only selected devices and/or ports through the VPN tunnel.
 
-The project includes robust startup, self-healing logic, and monitoring via `systemd` and MQTT.
+The project includes a robust startup process, self-healing logic, and monitoring via `systemd` and MQTT.
 
 ---
 
 ## ✨ Key Features
 
 *   **Selective Routing:** Choose exactly which devices (by IP) and ports should use the VPN. All other traffic goes through your regular internet connection for maximum speed.
-*   **Universal OpenVPN Client:** Built on the open standard OpenVPN. Thoroughly tested with **Proton VPN's free version**.
+*   **Official NordVPN Client:** Uses the fast and secure **NordLynx** protocol (WireGuard) for optimal performance.
 *   **Pi-hole Integration:** All DNS traffic is handled by Pi-hole for network-wide ad and tracker blocking.
-*   **Robust and Self-Healing:** A `systemd` service ensures automatic startup and restart on failure. The script actively verifies that the VPN connection is working and restores it if necessary.
-*   **Secure Startup:** The service waits for the network and the router to be available before it starts.
-*   **(Optional) Home Assistant Integration:** Send real-time data about VPN status and CPU temperature to your MQTT broker.
-*   **Easy Troubleshooting:** Includes a verification script to see live that the selective routing is working.
+*   **Robust and Self-Healing:** A `systemd` service ensures automatic startup and restarts on failure. The script actively verifies that the VPN connection is working and re-establishes it if necessary.
+*   **Safe Startup:** The service waits for the network and router to be available before starting, preventing error states after a reboot.
+*   **(Optional) Home Assistant Integration:** Send real-time data about VPN status, connected server, and CPU temperature to your MQTT broker for full monitoring.
+*   **Easy Troubleshooting:** Includes a verification script to see in real-time that the selective routing is working as expected.
 
 ---
 
 ## 📦 Requirements
 
-*   Raspberry Pi 3, 4, or 5 (wired network is strongly recommended).
+*   Raspberry Pi 3, 4, or 5 (a wired network connection is strongly recommended).
 *   Raspberry Pi OS Lite (64-bit), Bookworm or newer.
-*   A Proton VPN account (free or paid).
+*   An active NordVPN account.
 *   (Optional) An MQTT broker for Home Assistant integration.
 
 ---
 
-## 🔧 Step-by-Step Setup
+## 🔧 Step-by-step Setup
 
 ### 0. System Setup
 
 1.  Install Raspberry Pi OS Lite (64-bit).
 2.  Connect via SSH.
 3.  Update the system:
-    
+
     sudo apt update && sudo apt full-upgrade -y
     sudo reboot
-    
-4.  **Set a static IP address:**
-    On newer versions of Raspberry Pi OS, NetworkManager is used. **Adapt IP addresses to your own network.**
 
-    # Replace "Wired connection 1" with the name of your connection (check with 'nmcli con show')
-    # Replace IP addresses, gateway (your router's IP), and DNS servers
+4.  **Set a static IP address:**
+    Newer versions of Raspberry Pi OS use NetworkManager. **Customize the IP addresses for your own network.**
+
+    # Replace "Wired connection 1" with the name of your connection if needed (check with 'nmcli con show')
+    # Replace the IP addresses, gateway (your router's IP), and DNS servers
     sudo nmcli con mod "Wired connection 1" ipv4.method manual
     sudo nmcli con mod "Wired connection 1" ipv4.addresses 192.168.1.102/24
     sudo nmcli con mod "Wired connection 1" ipv4.gateway 192.168.1.1
@@ -58,11 +58,11 @@ The project includes robust startup, self-healing logic, and monitoring via `sys
 
     curl -sSL https://install.pi-hole.net | bash
 
-Follow the instructions. Choose `eth0` as the interface and select an upstream DNS provider (e.g., Cloudflare). Note down the administrator password.
+Follow the prompts. Choose `eth0` as the interface and select an upstream DNS provider (e.g., Cloudflare). Note down the admin password.
 
-### 2. Enable IP Forwarding and install `iptables-persistent`
+### 2. Enable IP Forwarding and Install `iptables-persistent`
 
-This allows the Pi to forward traffic and ensures that the firewall rules survive a reboot.
+This allows the Pi to forward traffic and ensures the firewall rules survive a reboot.
 
     sudo apt install iptables-persistent -y
 
@@ -70,50 +70,39 @@ Enable IP forwarding by editing `/etc/sysctl.conf`:
 
     sudo nano /etc/sysctl.conf
 
-Find the line `#net.ipv4.ip_forward=1` and remove the `#` in front. Save the file (Ctrl+X, Y, Enter) and apply the change:
+Find the line `#net.ipv4.ip_forward=1` and remove the `#` at the beginning. Save the file (Ctrl+X, Y, Enter) and apply the change:
 
     sudo sysctl -p
 
-### 3. Install OpenVPN and configure Proton VPN
+### 3. Install and Configure NordVPN
 
-This step sets up the VPN client itself and fetches the necessary files from Proton VPN.
+Install the official NordVPN client:
 
-1.  **Install OpenVPN:**
+    sh <(curl -sSf https://downloads.nordcdn.com/apps/linux/install.sh)
 
-    sudo apt update && sudo apt install openvpn -y
+Add your user to the `nordvpn` group and reboot for the change to take effect:
 
-2.  **Create a free Proton VPN account** at [protonvpn.com](https://protonvpn.com).
+    sudo usermod -aG nordvpn $USER
+    sudo reboot
 
-3.  **Get your OpenVPN credentials:**
-    *   Log in to your Proton account.
-    *   Navigate to **Account -> OpenVPN / IKEv2 username**.
-    *   Note down the **Username** and **Password** shown here. **Note:** This is *not* your regular Proton password.
+After rebooting, log in and configure the client. Disable all features that could interfere with the manual routing:
+    
+    nordvpn login
+    nordvpn set killswitch disabled
+    nordvpn set dns off
+    nordvpn set autoconnect disabled
+    nordvpn set firewall disabled
+    nordvpn set routing disabled
+    nordvpn set technology NordLynx
+    nordvpn set analytics disabled
 
-4.  **Download a server configuration file:**
-    *   On the same page, navigate to **Downloads -> OpenVPN configuration files**.
-    *   Select **Linux** as the platform and **UDP** as the protocol.
-    *   Download a server file from one of the free countries (e.g., Netherlands, Japan, or the US).
+### 4. Create a Custom Routing Table for the VPN
 
-5.  **Transfer the files to your Raspberry Pi:**
-    *   Create a folder for the configuration: `sudo mkdir -p /etc/openvpn/client`
-    *   Transfer the `.ovpn` file you downloaded to this folder. Give it a simple name, e.g.: `sudo mv your-downloaded-file.ovpn /etc/openvpn/client/proton.ovpn`
-    *   Create a file for your credentials: `sudo nano /etc/openvpn/client/proton_auth.txt`
-    *   Paste the username and password from step 3 on two separate lines:
-
-        YOUR_OPENVPN_USERNAME
-        YOUR_OPENVPN_PASSWORD
-
-    *   Save the file (Ctrl+X, Y, Enter) and **secure it** so only root can read it:
-
-        sudo chmod 600 /etc/openvpn/client/proton_auth.txt
-
-### 4. Create a custom routing table for the VPN
-
-    echo "200 vpn_table" | sudo tee -a /etc/iproute2/rt_tables
+    echo "200 nordvpntabell" | sudo tee -a /etc/iproute2/rt_tables
 
 ### 5. Configure Firewall and Selective Routing
 
-These `iptables` rules use the generic VPN interface `tun0`.
+These `iptables` rules set up a secure firewall and implement the selective routing logic.
 
     # --- STEP 1: Flush everything for a clean start ---
     sudo iptables -F && sudo iptables -t nat -F && sudo iptables -t mangle -F
@@ -133,7 +122,7 @@ These `iptables` rules use the generic VPN interface `tun0`.
     sudo iptables -A INPUT -p tcp --dport 53 -j ACCEPT # Pi-hole DNS
     sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT # Pi-hole Web
 
-    # --- STEP 4: MANGLE rules (Mark the specific traffic for VPN) ---
+    # --- STEP 4: MANGLE rules (Mark the specific traffic for the VPN) ---
     # CUSTOMIZE: Add the IP addresses of the clients that should use the VPN.
     CLIENT_IPS_TO_VPN="192.168.1.128 192.168.1.129 192.168.1.130"
     for ip in $CLIENT_IPS_TO_VPN; do
@@ -142,94 +131,100 @@ These `iptables` rules use the generic VPN interface `tun0`.
         sudo iptables -t mangle -A PREROUTING -s "$ip" -p tcp --dport 8080 -j MARK --set-mark 1
     done
 
-    # --- STEP 5: FORWARD rules (Correct logic for selective routing) ---
+    # --- STEP 5: FORWARD rules (The correct logic for selective routing) ---
     sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-    # Rule 1: Allow marked traffic to go out the VPN tunnel.
-    sudo iptables -A FORWARD -i eth0 -o tun0 -m mark --mark 1 -j ACCEPT
-    # Rule 2: Allow all other traffic from the LAN to go out the regular way.
+    # Rule 1: Allow marked traffic to exit through the VPN tunnel.
+    sudo iptables -A FORWARD -i eth0 -o nordlynx -m mark --mark 1 -j ACCEPT
+    # Rule 2: Allow all other traffic from the LAN to exit through the regular route.
     sudo iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT
 
     # --- STEP 6: NAT rules (Critical for both traffic types to work) ---
-    sudo iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+    sudo iptables -t nat -A POSTROUTING -o nordlynx -j MASQUERADE
     sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 
     # --- STEP 7: Save the rules permanently ---
     sudo netfilter-persistent save
     echo "Firewall rules have been set and saved."
 
-### 6. Create the main script `protonvpn-gateway.sh`
+### 6. Create the main script `nordvpn-gateway.sh`
 
-    # Download the script from the new repo (remember to change the link when it's public)
-    sudo wget -O /usr/local/bin/protonvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/protonvpn-gateway.sh
+    # Download the main script from GitHub
+    sudo wget -O /usr/local/bin/nordvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-nordvpn-gateway/main/nordvpn-gateway.sh
 
     # Make it executable
-    sudo chmod +x /usr/local/bin/protonvpn-gateway.sh
+    sudo chmod +x /usr/local/bin/nordvpn-gateway.sh
 
-    # Open the file to customize your personal variables
-    sudo nano /usr/local/bin/protonvpn-gateway.sh
+    # Open the file to customize your personal variables (especially MQTT)
+    sudo nano /usr/local/bin/nordvpn-gateway.sh
 
-### 7. Create the `systemd` service
+### 7. Create the `systemd` Service
+
+This ensures the script starts automatically.
 
 1.  Create the service file:
     
-    sudo nano /etc/systemd/system/protonvpn-gateway.service
+    sudo nano /etc/systemd/system/nordvpn-gateway.service
     
 2.  Paste the content below:
     
     [Unit]
-    Description=ProtonVPN Gateway Service
+    Description=NordVPN Gateway Service
     After=network-online.target pihole-FTL.service
     Wants=network-online.target
 
     [Service]
     Type=simple
     User=root
-    ExecStart=/usr/local/bin/protonvpn-gateway.sh
+
+    # Waits to ping the gateway before starting the main script.
+    ExecStartPre=/bin/bash -c 'GATEWAY_IP=$(grep -oP "CORRECT_GATEWAY=\K\S+" /usr/local/bin/nordvpn-gateway.sh | tr -d "\""); echo "Waiting for gateway ($GATEWAY_IP) to respond..."; while ! ping -c 1 -W 2 $GATEWAY_IP &>/dev/null; do sleep 5; done; echo "Gateway is responding, starting main script."'
+
+    ExecStart=/usr/local/bin/nordvpn-gateway.sh
+
     Restart=always
     RestartSec=30
-    StandardOutput=file:/var/log/protonvpn-gateway.log
-    StandardError=file:/var/log/protonvpn-gateway.log
+
+    StandardOutput=file:/var/log/nordvpn-gateway.log
+    StandardError=file:/var/log/nordvpn-gateway.log
 
     [Install]
     WantedBy=multi-user.target
     
-3.  Enable the service:
+3.  Save and close the file.
+4.  Enable and start the service:
     
     sudo systemctl daemon-reload
-    sudo systemctl enable protonvpn-gateway.service
-    sudo systemctl start protonvpn-gateway.service
+    sudo systemctl enable nordvpn-gateway.service
+    sudo systemctl start nordvpn-gateway.service
 
-### 8. Configure your router
+### 8. Configure Your Router
 
-Log in to your router and make the following changes in the DHCP settings for your local network:
-*   Set **Default Gateway** to your Raspberry Pi's IP (e.g., `192.168.1.102`).
-*   Set **DNS Server** to your Raspberry Pi's IP (e.g., `192.168.1.102`).
+Log into your router and make the following changes to the DHCP settings for your local network:
+*   Set the **Default Gateway** to your Raspberry Pi's IP (e.g., `192.168.1.102`).
+*   Set the **DNS Server** to your Raspberry Pi's IP (e.g., `192.168.1.102`).
 
-Reboot the devices on your network for them to get the new settings.
+Reboot the devices on your network for them to receive the new settings.
 
 ---
 
 ## Acknowledgements
-The project is written and maintained by @Howard0000. An AI assistant has helped simplify explanations, clean up the README, and polish the script. All suggestions were manually reviewed before being incorporated, and all configuration and testing were done by me.
-
+This project is written and maintained by @Howard0000. An AI assistant helped simplify explanations, clean up the README, and refine the scripts. All suggestions were manually reviewed before implementation, and all configuration and testing were done by me.
 
 ## 📝 License
-MIT — see `LICENSE`.
-
----
+MIT — see the `LICENSE` file.
 
 ## 🔬 Testing and Verification
 
 Use these commands to check that everything is working:
 
-*   **Check service status:** `sudo systemctl status protonvpn-gateway.service`
-*   **Watch the log live:** `tail -f /var/log/protonvpn-gateway.log`
-*   **Check the VPN interface:** `ip addr show tun0` (look for an IP address)
-*   **Check routing rules:** `ip rule show` and `ip route show table vpn_table`
+*   **Check service status:** `sudo systemctl status nordvpn-gateway.service`
+*   **Watch the log live:** `tail -f /var/log/nordvpn-gateway.log`
+*   **Check VPN status:** `nordvpn status`
+*   **Check routing rules:** `ip rule show` and `ip route show table nordvpntabell`
 
 ### Verification Script
 
-    # Download the script from the new repo (remember to change the link when it's public)
-    wget https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/verify_traffic.sh
+    # Download the verification script from GitHub
+    wget https://raw.githubusercontent.com/Howard0000/raspberrypi-nordvpn-gateway/main/verify_traffic.sh
     chmod +x verify_traffic.sh
     sudo ./verify_traffic.sh
