@@ -34,6 +34,7 @@ OPENVPN_CONFIG="/etc/openvpn/client/proton.ovpn"         # TILPASS: Sti til din 
 OPENVPN_AUTH="/etc/openvpn/client/proton_auth.txt"       # TILPASS: Sti til din auth-fil (chmod 600)
 
 # --- MQTT Innstillinger ---
+ENABLE_CPU_TEMP=true/false         # Sett til true hvis du bruker CPU TEMP, ellers false
 MQTT_ENABLED=false                 # Sett til true hvis du bruker MQTT, ellers false
 MQTT_BROKER="XXX.XXX.X.XXX"        # TILPASS: Din MQTT broker IP
 MQTT_USER=""                       # TILPASS: MQTT bruker (kan være tom)
