@@ -1,8 +1,8 @@
-# Raspberry Pi: Pi-hole + ProtonVPN Gateway
+# Raspberry Pi: Pi-hole + NordVPN Gateway (v2.0)
 
 > 🇳🇴 Norsk · 🇬🇧 [English version](README.en.md)
 
-Dette prosjektet setter opp en Raspberry Pi som en kombinert DNS-filtreringsserver (Pi-hole) og en avansert VPN-gateway. Løsningen bruker den universelle OpenVPN-klienten, er testet med **Proton VPN (gratisversjon)**, og har funksjonalitet for **selektiv ruting**, som lar deg sende trafikk fra kun utvalgte enheter og/eller porter gjennom VPN-tunnelen.
+Dette prosjektet setter opp en Raspberry Pi som en kombinert DNS-filtreringsserver (Pi-hole) og en avansert NordVPN-gateway. Løsningen bruker den offisielle NordVPN-klienten med NordLynx-protokollen og har funksjonalitet for **selektiv ruting**, som lar deg sende trafikk fra kun utvalgte enheter og/eller porter gjennom VPN-tunnelen.
 
 Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning via `systemd` og MQTT.
 
@@ -11,12 +11,12 @@ Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning vi
 ## ✨ Nøkkelfunksjoner
 
 *   **Selektiv Ruting:** Velg nøyaktig hvilke enheter (via IP) og porter som skal bruke VPN. All annen trafikk går via din vanlige internettforbindelse for maksimal hastighet.
-*   **Universell OpenVPN-klient:** Bygget på den åpne standarden OpenVPN. Grundig testet med **Proton VPNs gratisversjon**.
+*   **Offisiell NordVPN-klient:** Bruker den raske og sikre **NordLynx**-protokollen (WireGuard) for optimal ytelse.
 *   **Pi-hole Integrasjon:** All DNS-trafikk håndteres av Pi-hole for nettverksdekkende annonse- og sporingsblokkering.
 *   **Robust og Selvreparerende:** En `systemd`-tjeneste sørger for automatisk oppstart og omstart ved feil. Skriptet verifiserer aktivt at VPN-tilkoblingen fungerer og gjenoppretter den om nødvendig.
-*   **Sikker Oppstart:** Tjenesten venter på at nettverket og ruteren er tilgjengelig før den starter.
-*   **(Valgfritt) Home Assistant Integrasjon:** Send sanntidsdata om VPN-status og CPU-temperatur til din MQTT-broker.
-*   **Enkel Feilsøking:** Inkluderer et verifiseringsskript for å se live at den selektive rutingen fungerer.
+*   **Sikker Oppstart:** Tjenesten venter på at nettverket og ruteren er tilgjengelig før den starter, for å unngå feiltilstander etter en omstart.
+*   **(Valgfritt) Home Assistant Integrasjon:** Send sanntidsdata om VPN-status, tilkoblet server og CPU-temperatur til din MQTT-broker for full overvåkning.
+*   **Enkel Feilsøking:** Inkluderer et verifiseringsskript for å se live at den selektive rutingen fungerer som forventet.
 
 ---
 
@@ -24,7 +24,7 @@ Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning vi
 
 *   Raspberry Pi 3, 4 eller 5 (kablet nettverk er sterkt anbefalt).
 *   Raspberry Pi OS Lite (64-bit), Bookworm eller nyere.
-*   En Proton VPN-konto (gratis eller betalt).
+*   En aktiv NordVPN-konto.
 *   (Valgfritt) En MQTT-broker for Home Assistant-integrasjon.
 
 ---
@@ -36,10 +36,10 @@ Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning vi
 1.  Installer Raspberry Pi OS Lite (64-bit).
 2.  Koble til via SSH.
 3.  Oppdater systemet:
-    
+
     sudo apt update && sudo apt full-upgrade -y
     sudo reboot
-    
+
 4.  **Sett statisk IP-adresse:**
     På nyere versjoner av Raspberry Pi OS brukes NetworkManager. **Tilpass IP-adresser til ditt eget nettverk.**
 
@@ -74,46 +74,35 @@ Finn linjen `#net.ipv4.ip_forward=1` og fjern `#` foran. Lagre filen (Ctrl+X, Y,
 
     sudo sysctl -p
 
-### 3. Installer OpenVPN og konfigurer Proton VPN
+### 3. Installer og konfigurer NordVPN
 
-Dette steget setter opp selve VPN-klienten og henter de nødvendige filene fra Proton VPN.
+Installer den offisielle NordVPN-klienten:
 
-1.  **Installer OpenVPN:**
+    sh <(curl -sSf https://downloads.nordcdn.com/apps/linux/install.sh)
 
-    sudo apt update && sudo apt install openvpn -y
+Gi din bruker tilgang til NordVPN og start på nytt:
 
-2.  **Opprett en gratis Proton VPN-konto** på [protonvpn.com](https://protonvpn.com).
+    sudo usermod -aG nordvpn $USER
+    sudo reboot
 
-3.  **Hent dine OpenVPN-credentials:**
-    *   Logg inn på din Proton-konto.
-    *   Naviger til **Konto -> OpenVPN / IKEv2 brukernavn**.
-    *   Noter ned **Brukernavnet** og **Passordet** som vises her. **OBS:** Dette er *ikke* ditt vanlige Proton-passord.
-
-4.  **Last ned en server-konfigurasjonsfil:**
-    *   På samme side, naviger til **Nedlastinger -> OpenVPN-konfigurasjonsfiler**.
-    *   Velg **Linux** som plattform og **UDP** som protokoll.
-    *   Last ned en server-fil fra et av gratislandene (f.eks. Nederland, Japan eller USA).
-
-5.  **Overfør filene til din Raspberry Pi:**
-    *   Opprett en mappe for konfigurasjonen: `sudo mkdir -p /etc/openvpn/client`
-    *   Overfør `.ovpn`-filen du lastet ned til denne mappen. Gi den et enkelt navn, f.eks.: `sudo mv din-nedlastede-fil.ovpn /etc/openvpn/client/proton.ovpn`
-    *   Opprett en fil for dine credentials: `sudo nano /etc/openvpn/client/proton_auth.txt`
-    *   Lim inn brukernavnet og passordet fra steg 3 på to separate linjer:
-
-        DITT_OPENVPN_BRUKERNAVN
-        DITT_OPENVPN_PASSORD
-
-    *   Lagre filen (Ctrl+X, Y, Enter) og **sikre den** slik at kun root kan lese den:
-
-        sudo chmod 600 /etc/openvpn/client/proton_auth.txt
+Etter omstart, logg inn og konfigurer klienten. Deaktiver alle funksjoner som kan forstyrre den manuelle rutingen:
+    
+    nordvpn login
+    nordvpn set killswitch disabled
+    nordvpn set dns off
+    nordvpn set autoconnect disabled
+    nordvpn set firewall disabled
+    nordvpn set routing disabled
+    nordvpn set technology NordLynx
+    nordvpn set analytics disabled
 
 ### 4. Opprett egen routing-tabell for VPN
 
-    echo "200 vpn_table" | sudo tee -a /etc/iproute2/rt_tables
+    echo "200 nordvpntabell" | sudo tee -a /etc/iproute2/rt_tables
 
 ### 5. Konfigurer Brannmur og Selektiv Ruting
 
-Disse `iptables`-reglene bruker det generiske VPN-grensesnittet `tun0`.
+Disse `iptables`-reglene setter opp en sikker brannmur og implementerer den selektive rutingen.
 
     # --- STEG 1: Tøm alt for en ren start ---
     sudo iptables -F && sudo iptables -t nat -F && sudo iptables -t mangle -F
@@ -145,59 +134,68 @@ Disse `iptables`-reglene bruker det generiske VPN-grensesnittet `tun0`.
     # --- STEG 5: FORWARD-regler (Korrekt logikk for selektiv ruting) ---
     sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
     # Regel 1: Tillat merket trafikk å gå ut VPN-tunnelen.
-    sudo iptables -A FORWARD -i eth0 -o tun0 -m mark --mark 1 -j ACCEPT
+    sudo iptables -A FORWARD -i eth0 -o nordlynx -m mark --mark 1 -j ACCEPT
     # Regel 2: Tillat all annen trafikk fra LAN å gå ut den vanlige veien.
     sudo iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT
 
     # --- STEG 6: NAT-regler (Kritisk for at begge trafikktyper skal virke) ---
-    sudo iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+    sudo iptables -t nat -A POSTROUTING -o nordlynx -j MASQUERADE
     sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 
     # --- STEG 7: Lagre reglene permanent ---
     sudo netfilter-persistent save
     echo "Brannmurregler er satt og lagret."
 
-### 6. Opprett hovedskriptet `protonvpn-gateway.sh`
+### 6. Opprett hovedskriptet `nordvpn-gateway.sh`
 
-    # Last ned skriptet fra det nye repoet (husk å endre linken når det er offentlig)
-    sudo wget -O /usr/local/bin/protonvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/protonvpn-gateway.sh
+    # Last ned hovedskriptet fra GitHub
+    sudo wget -O /usr/local/bin/nordvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-nordvpn-gateway/main/nordvpn-gateway.sh
 
     # Gjør det kjørbart
-    sudo chmod +x /usr/local/bin/protonvpn-gateway.sh
+    sudo chmod +x /usr/local/bin/nordvpn-gateway.sh
 
-    # Åpne filen for å tilpasse dine personlige variabler
-    sudo nano /usr/local/bin/protonvpn-gateway.sh
+    # Åpne filen for å tilpasse dine personlige variabler (spesielt MQTT)
+    sudo nano /usr/local/bin/nordvpn-gateway.sh
 
 ### 7. Opprett `systemd`-tjeneste
 
+Dette sikrer at skriptet starter automatisk.
+
 1.  Opprett tjenestefilen:
     
-    sudo nano /etc/systemd/system/protonvpn-gateway.service
+    sudo nano /etc/systemd/system/nordvpn-gateway.service
     
 2.  Lim inn innholdet under:
     
     [Unit]
-    Description=ProtonVPN Gateway Service
+    Description=NordVPN Gateway Service
     After=network-online.target pihole-FTL.service
     Wants=network-online.target
 
     [Service]
     Type=simple
     User=root
-    ExecStart=/usr/local/bin/protonvpn-gateway.sh
+
+    # Venter til den kan pinge gatewayen før hovedscriptet starter.
+    ExecStartPre=/bin/bash -c 'GATEWAY_IP=$(grep -oP "CORRECT_GATEWAY=\K\S+" /usr/local/bin/nordvpn-gateway.sh | tr -d "\""); echo "Venter på at gateway ($GATEWAY_IP) skal svare..."; while ! ping -c 1 -W 2 $GATEWAY_IP &>/dev/null; do sleep 5; done; echo "Gateway svarer, starter hovedscript."'
+
+    ExecStart=/usr/local/bin/nordvpn-gateway.sh
+
     Restart=always
     RestartSec=30
-    StandardOutput=file:/var/log/protonvpn-gateway.log
-    StandardError=file:/var/log/protonvpn-gateway.log
+
+    StandardOutput=file:/var/log/nordvpn-gateway.log
+    StandardError=file:/var/log/nordvpn-gateway.log
 
     [Install]
     WantedBy=multi-user.target
     
-3.  Aktiver tjenesten:
+3.  Lagre og lukk filen.
+4.  Aktiver og start tjenesten:
     
     sudo systemctl daemon-reload
-    sudo systemctl enable protonvpn-gateway.service
-    sudo systemctl start protonvpn-gateway.service
+    sudo systemctl enable nordvpn-gateway.service
+    sudo systemctl start nordvpn-gateway.service
 
 ### 8. Konfigurer ruteren din
 
@@ -216,20 +214,19 @@ Prosjektet er skrevet og vedlikeholdt av @Howard0000. En KI-assistent har hjulpe
 ## 📝 Lisens
 MIT — se `LICENSE`.
 
----
 
 ## 🔬 Testing og Verifisering
 
 Bruk disse kommandoene for å sjekke at alt fungerer:
 
-*   **Sjekk tjenestestatus:** `sudo systemctl status protonvpn-gateway.service`
-*   **Se på loggen live:** `tail -f /var/log/protonvpn-gateway.log`
-*   **Sjekk VPN-grensesnittet:** `ip addr show tun0` (se etter en IP-adresse)
-*   **Sjekk rutingregler:** `ip rule show` og `ip route show table vpn_table`
+*   **Sjekk tjenestestatus:** `sudo systemctl status nordvpn-gateway.service`
+*   **Se på loggen live:** `tail -f /var/log/nordvpn-gateway.log`
+*   **Sjekk VPN-status:** `nordvpn status`
+*   **Sjekk rutingregler:** `ip rule show` og `ip route show table nordvpntabell`
 
 ### Verifiseringsskript
 
-    # Last ned skriptet fra det nye repoet (husk å endre linken når det er offentlig)
-    wget https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/verify_traffic.sh
+    # Last ned verifiseringsskriptet fra GitHub
+    wget https://raw.githubusercontent.com/Howard0000/raspberrypi-nordvpn-gateway/main/verify_traffic.sh
     chmod +x verify_traffic.sh
     sudo ./verify_traffic.sh
