@@ -1,5 +1,6 @@
 # Raspberry Pi: Pi-hole + ProtonVPN Gateway
-GB [English](README.en.md) ·NO [Norsk](README.md)
+
+🇳🇴 [Norsk](README.md) · 🇬🇧 [English](README.en.md)
 
 This project sets up a Raspberry Pi as a combined DNS filtering server (Pi-hole) and ProtonVPN gateway with selective routing based on IP and/or ports. It includes robust startup and monitoring via MQTT and systemd.
 
@@ -214,13 +215,19 @@ Then restart the devices on your network so they get the new settings.
 * Logs: `journalctl -u protonvpn-gateway -f`
 * Check routing: `ip rule show`, `ip route show table vpn_table`
 
-Download and run the verification script to confirm selective routing works:
+- Install tcpdump (required for the verify script):
 
-```bash
-wget https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/verify_traffic.sh
-chmod +x verify_traffic.sh
-sudo ./verify_traffic.sh
-```
+  ```bash
+  sudo apt install tcpdump
+  ```
+
+- Download and run the verification script to confirm selective routing works:
+
+  ```bash
+  wget https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/verify_traffic.sh
+  chmod +x verify_traffic.sh
+  sudo ./verify_traffic.sh
+  ```
 
 > You can customize `verify_traffic.sh` by editing three variables at the top:
 >
