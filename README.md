@@ -1,8 +1,8 @@
-# Raspberry Pi: Pi-hole + NordVPN Gateway (v2.0)
+# Raspberry Pi: Pi-hole + ProtonVPN Gateway
 
 > 🇳🇴 Norsk · 🇬🇧 [English version](README.en.md)
 
-Dette prosjektet setter opp en Raspberry Pi som en kombinert DNS-filtreringsserver (Pi-hole) og en avansert NordVPN-gateway. Løsningen bruker den offisielle NordVPN-klienten med NordLynx-protokollen og har funksjonalitet for **selektiv ruting**, som lar deg sende trafikk fra kun utvalgte enheter og/eller porter gjennom VPN-tunnelen.
+Dette prosjektet setter opp en Raspberry Pi som en kombinert DNS-filtreringsserver (Pi-hole) og en avansert Proton VPN-gateway. Løsningen bruker den offisielle Proton VPN-klienten med OpenVPN-protokollen og har funksjonalitet for **selektiv ruting**, som lar deg sende trafikk fra kun utvalgte enheter og/eller porter gjennom VPN-tunnelen.
 
 Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning via `systemd` og MQTT.
 
