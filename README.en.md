@@ -1,8 +1,8 @@
-# Raspberry Pi: Pi-hole + NordVPN Gateway (selective routing)
+# Raspberry Pi: Pi-hole + Proton VPN Gateway (selective routing)
 
 > 🇬🇧 English · 🇳🇴 [Norsk versjon](README.md)
 
-This project turns a Raspberry Pi into a **DNS filter (Pi-hole)** and **NordVPN gateway** with **selective routing**: only chosen clients/ports are sent through the VPN, while everything else follows the normal WAN route. The setup is hardened with iptables and made robust with systemd.
+This project turns a Raspberry Pi into a **DNS filter (Pi-hole)** and **Proton VPN gateway** with **selective routing**: only chosen clients/ports are sent through the VPN, while everything else follows the normal WAN route. The setup is hardened with iptables and made robust with systemd.
 
 ## ✨ Features
 - Pi-hole as the **primary DNS** for your LAN (no DNS leakage — keep `nordvpn set dns off`).
