@@ -32,25 +32,22 @@ The project includes a robust startup process, self-healing logic, and monitorin
 ## 🔧 Step-by-step Setup
 
 ### 0. System Setup
-*(This section is identical to the previous project)*
-...
+*(This section is identical to the NordVPN project)*
 
 ### 1. Install Pi-hole
-*(This section is identical to the previous project)*
-...
+*(This section is identical to the NordVPN project)*
 
 ### 2. Enable IP Forwarding and `iptables-persistent`
-*(This section is identical to the previous project)*
-...
+*(This section is identical to the NordVPN project)*
 
 ### 3. Install OpenVPN and Configure Proton VPN
 
 This step sets up the VPN client itself and fetches the necessary files from Proton VPN.
 
 1.  **Install OpenVPN:**
-    ```bash
+
     sudo apt update && sudo apt install openvpn -y
-    ```
+
 2.  **Create a free Proton VPN account** at [protonvpn.com](https://protonvpn.com).
 
 3.  **Get your OpenVPN credentials:**
@@ -68,14 +65,13 @@ This step sets up the VPN client itself and fetches the necessary files from Pro
     *   Transfer the `.ovpn` file you downloaded to this directory. Give it a simple name, e.g.: `sudo mv your-downloaded-file.ovpn /etc/openvpn/client/proton.ovpn`
     *   Create a file for your credentials: `sudo nano /etc/openvpn/client/proton_auth.txt`
     *   Paste the username and password from step 3 on two separate lines:
-        ```
+
         YOUR_OPENVPN_USERNAME
         YOUR_OPENVPN_PASSWORD
-        ```
+
     *   Save the file (Ctrl+X, Y, Enter) and **secure it** so only root can read it:
-        ```bash
+
         sudo chmod 600 /etc/openvpn/client/proton_auth.txt
-        ```
 
 ### 4. Create a Custom Routing Table for the VPN
 
@@ -83,40 +79,69 @@ This step sets up the VPN client itself and fetches the necessary files from Pro
 
 ### 5. Configure Firewall and Selective Routing
 
-These `iptables` rules are nearly identical to the previous project but have been updated to use the generic VPN interface `tun0`.
+These `iptables` rules use the generic VPN interface `tun0`.
 
-    # --- STEP 1 ...
-    # ... (paste your entire iptables block here) ...
-    
+    # --- STEP 1: Flush everything for a clean start ---
+    sudo iptables -F && sudo iptables -t nat -F && sudo iptables -t mangle -F
+    sudo iptables -X && sudo iptables -t nat -X && sudo iptables -t mangle -X
+
+    # --- STEP 2: Set a secure default policy ---
+    sudo iptables -P INPUT DROP
+    sudo iptables -P FORWARD DROP
+    sudo iptables -P OUTPUT ACCEPT
+
+    # --- STEP 3: INPUT rules (Necessary exceptions for the Pi itself) ---
+    sudo iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    sudo iptables -A INPUT -i lo -j ACCEPT
+    sudo iptables -A INPUT -p icmp -j ACCEPT
+    sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT # SSH
+    sudo iptables -A INPUT -p udp --dport 53 -j ACCEPT # Pi-hole DNS
+    sudo iptables -A INPUT -p tcp --dport 53 -j ACCEPT # Pi-hole DNS
+    sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT # Pi-hole Web
+
+    # --- STEP 4: MANGLE rules (Mark the specific traffic for the VPN) ---
+    # CUSTOMIZE: Add the IP addresses of the clients that should use the VPN.
+    CLIENT_IPS_TO_VPN="192.168.1.128 192.168.1.129 192.168.1.130"
+    for ip in $CLIENT_IPS_TO_VPN; do
+        echo "Adding MARK rule for $ip (TCP port 8080 only)"
+        # CUSTOMIZE: Change the port number if you need something other than 8080.
+        sudo iptables -t mangle -A PREROUTING -s "$ip" -p tcp --dport 8080 -j MARK --set-mark 1
+    done
+
+    # --- STEP 5: FORWARD rules (The correct logic for selective routing) ---
+    sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
     # Rule 1: Allow marked traffic to exit through the VPN tunnel.
     sudo iptables -A FORWARD -i eth0 -o tun0 -m mark --mark 1 -j ACCEPT
-    # Rule 2: ...
-    # ...
-    # --- STEP 6 ...
+    # Rule 2: Allow all other traffic from the LAN to exit through the regular route.
+    sudo iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT
+
+    # --- STEP 6: NAT rules (Critical for both traffic types to work) ---
     sudo iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
-    # ...
-    
-    # --- STEP 7 ...
+    sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+
+    # --- STEP 7: Save the rules permanently ---
     sudo netfilter-persistent save
+    echo "Firewall rules have been set and saved."
 
 ### 6. Create the main script `protonvpn-gateway.sh`
 
-    # Download the script from the NEW repository (remember to change the link when it's ready)
+    # Download the script from the new repo (remember to change the link when public)
     sudo wget -O /usr/local/bin/protonvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/protonvpn-gateway.sh
 
     # Make it executable
     sudo chmod +x /usr/local/bin/protonvpn-gateway.sh
-    # Open and customize
+
+    # Open the file to customize your personal variables
     sudo nano /usr/local/bin/protonvpn-gateway.sh
 
 ### 7. Create the `systemd` Service
 
 1.  Create the service file:
-    ```bash
+    
     sudo nano /etc/systemd/system/protonvpn-gateway.service
-    ```
-2.  Paste the content below (note the changes in `Description` and `ExecStart`):
-    ```ini
+    
+2.  Paste the content below:
+    
     [Unit]
     Description=ProtonVPN Gateway Service
     After=network-online.target pihole-FTL.service
@@ -125,7 +150,6 @@ These `iptables` rules are nearly identical to the previous project but have bee
     [Service]
     Type=simple
     User=root
-    ExecStartPre=... # (This can be kept, it just checks the gateway)
     ExecStart=/usr/local/bin/protonvpn-gateway.sh
     Restart=always
     RestartSec=30
@@ -134,19 +158,24 @@ These `iptables` rules are nearly identical to the previous project but have bee
 
     [Install]
     WantedBy=multi-user.target
-    ```
+    
 3.  Enable the service:
-    ```bash
+    
     sudo systemctl daemon-reload
     sudo systemctl enable protonvpn-gateway.service
     sudo systemctl start protonvpn-gateway.service
-    ```
 
 ### 8. Configure Your Router
-*(This section is identical to the previous project)*
-...
+*(This section is identical to the NordVPN project)*
 
-### 9. Testing and Verification (Updated)
+---
+
+## 📝 License
+MIT — see the `LICENSE` file.
+
+---
+
+## 🔬 Testing and Verification
 
 Use these commands to check that everything is working:
 
@@ -154,3 +183,10 @@ Use these commands to check that everything is working:
 *   **Watch the log live:** `tail -f /var/log/protonvpn-gateway.log`
 *   **Check the VPN interface:** `ip addr show tun0` (look for an IP address)
 *   **Check routing rules:** `ip rule show` and `ip route show table vpn_table`
+
+### Verification Script
+
+    # Download the script from the new repo (remember to change the link when public)
+    wget https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/verify_traffic.sh
+    chmod +x verify_traffic.sh
+    sudo ./verify_traffic.sh
