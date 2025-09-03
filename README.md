@@ -31,14 +31,14 @@ Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning vi
 
 ## 🔧 Steg-for-steg-oppsett
 
-### 0. Systemoppsett (Identisk med forrige prosjekt)
-... *(behold denne delen som den er)* ...
+### 0. Systemoppsett
+*(Denne seksjonen er identisk med NordVPN-prosjektet)*
 
-### 1. Installer Pi-hole (Identisk med forrige prosjekt)
-... *(behold denne delen som den er)* ...
+### 1. Installer Pi-hole
+*(Denne seksjonen er identisk med NordVPN-prosjektet)*
 
-### 2. Aktiver IP Forwarding og `iptables-persistent` (Identisk med forrige prosjekt)
-... *(behold denne delen som den er)* ...
+### 2. Aktiver IP Forwarding og `iptables-persistent`
+*(Denne seksjonen er identisk med NordVPN-prosjektet)*
 
 ### 3. Installer OpenVPN og konfigurer Proton VPN
 
@@ -80,73 +80,47 @@ Dette steget setter opp selve VPN-klienten og henter de nødvendige filene fra P
 
 ### 5. Konfigurer Brannmur og Selektiv Ruting
 
-Disse `iptables`-reglene er nesten identiske med forrige prosjekt, men er oppdatert til å bruke det generiske VPN-grensesnittet `tun0`.
+Disse `iptables`-reglene bruker det generiske VPN-grensesnittet `tun0`.
 
-    # --- STEG 1 ...
-    # ... (lim inn hele iptables-blokken din her) ...
-    
-    # Regel 1: Tillat merket trafikk å gå ut VPN-tunnelen.
-    sudo iptables -A FORWARD -i eth0 -o tun0 -m mark --mark 1 -j ACCEPT
-    # Regel 2: ...
-    # ...
-    # --- STEG 6 ...
-    sudo iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
-    # ...
-    
-    # --- STEG 7 ...
-    sudo netfilter-persistent save
+```bash
+# --- STEG 1: Tøm alt for en ren start ---
+sudo iptables -F && sudo iptables -t nat -F && sudo iptables -t mangle -F
+sudo iptables -X && sudo iptables -t nat -X && sudo iptables -t mangle -X
 
-### 6. Opprett hovedskriptet `protonvpn-gateway.sh`
+# --- STEG 2: Sett en sikker standard policy ---
+sudo iptables -P INPUT DROP
+sudo iptables -P FORWARD DROP
+sudo iptables -P OUTPUT ACCEPT
 
-    # Last ned skriptet fra det NYE repoet (husk å endre linken når det er klart)
-    sudo wget -O /usr/local/bin/protonvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/protonvpn-gateway.sh
+# --- STEG 3: INPUT-regler (Nødvendige unntak for Pi-en selv) ---
+sudo iptables -A INPUT -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -A INPUT -i lo -j ACCEPT
+sudo iptables -A INPUT -p icmp -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT # SSH
+sudo iptables -A INPUT -p udp --dport 53 -j ACCEPT # Pi-hole DNS
+sudo iptables -A INPUT -p tcp --dport 53 -j ACCEPT # Pi-hole DNS
+sudo iptables -A INPUT -p tcp --dport 80 -j ACCEPT # Pi-hole Web
 
-    # Gjør det kjørbart
-    sudo chmod +x /usr/local/bin/protonvpn-gateway.sh
-    # Åpne og tilpass
-    sudo nano /usr/local/bin/protonvpn-gateway.sh
+# --- STEG 4: MANGLE-regler (Marker den spesifikke trafikken for VPN) ---
+# TILPASS: Legg til IP-adressene til klientene som skal bruke VPN.
+CLIENT_IPS_TO_VPN="192.168.1.128 192.168.1.129 192.168.1.130"
+for ip in $CLIENT_IPS_TO_VPN; do
+    echo "Legger til MARK-regel for $ip (kun TCP port 8080)"
+    # TILPASS: Endre portnummeret hvis du trenger noe annet enn 8080.
+    sudo iptables -t mangle -A PREROUTING -s "$ip" -p tcp --dport 8080 -j MARK --set-mark 1
+done
 
-### 7. Opprett `systemd`-tjeneste
+# --- STEG 5: FORWARD-regler (Korrekt logikk for selektiv ruting) ---
+sudo iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+# Regel 1: Tillat merket trafikk å gå ut VPN-tunnelen.
+sudo iptables -A FORWARD -i eth0 -o tun0 -m mark --mark 1 -j ACCEPT
+# Regel 2: Tillat all annen trafikk fra LAN å gå ut den vanlige veien.
+sudo iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT
 
-1.  Opprett tjenestefilen:
-    ```bash
-    sudo nano /etc/systemd/system/protonvpn-gateway.service
-    ```
-2.  Lim inn innholdet under (merk endringene i `Description` og `ExecStart`):
-    ```ini
-    [Unit]
-    Description=ProtonVPN Gateway Service
-    After=network-online.target pihole-FTL.service
-    Wants=network-online.target
+# --- STEG 6: NAT-regler (Kritisk for at begge trafikktyper skal virke) ---
+sudo iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 
-    [Service]
-    Type=simple
-    User=root
-    ExecStartPre=... # (Denne kan beholdes, den sjekker bare gateway)
-    ExecStart=/usr/local/bin/protonvpn-gateway.sh
-    Restart=always
-    RestartSec=30
-    StandardOutput=file:/var/log/protonvpn-gateway.log
-    StandardError=file:/var/log/protonvpn-gateway.log
-
-    [Install]
-    WantedBy=multi-user.target
-    ```
-3.  Aktiver tjenesten:
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl enable protonvpn-gateway.service
-    sudo systemctl start protonvpn-gateway.service
-    ```
-
-### 8. Konfigurer ruteren din (Identisk med forrige prosjekt)
-... *(behold denne delen som den er)* ...
-
-### 9. Testing og Verifisering (Oppdatert)
-
-Bruk disse kommandoene for å sjekke at alt fungerer:
-
-*   **Sjekk tjenestestatus:** `sudo systemctl status protonvpn-gateway.service`
-*   **Se på loggen live:** `tail -f /var/log/protonvpn-gateway.log`
-*   **Sjekk VPN-grensesnittet:** `ip addr show tun0` (se etter en IP-adresse)
-*   **Sjekk rutingregler:** `ip rule show` og `ip route show table vpn_table`
+# --- STEG 7: Lagre reglene permanent ---
+sudo netfilter-persistent save
+echo "Brannmurregler er satt og lagret."
