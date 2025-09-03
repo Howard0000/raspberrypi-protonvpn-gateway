@@ -17,17 +17,14 @@ PACKET_COUNT=$(sudo iptables -t mangle -L PREROUTING -v -n | grep 'tcp dpt:8080'
 
 if [[ -z "$PACKET_COUNT" ]]; then
   echo "FEIL: Fant ingen iptables-regel for TCP port 8080 i mangle-tabellen."
-  echo "Dette er uventet. Sjekk at iptables-oppsettet ble lagret riktig."
   exit 1
 fi
 
 echo "Fant følgende regel(er) som matcher port 8080:"
-# Viser regelen(e) med farger for lesbarhet
 sudo iptables -t mangle -L PREROUTING -v -n --line-numbers | grep --color=always '8080'
 echo
 echo -e "Nåværende pakketeller (pkts): ${GREEN}${PACKET_COUNT}${NC}"
 echo "Dette tallet viser hvor mange pakker som hittil er blitt merket for VPN."
-echo "Hvis tallet er større enn 0, er det et godt tegn!"
 echo
 read -p "Trykk [Enter] for å starte live-analysen av VPN-trafikken..."
 
@@ -38,31 +35,29 @@ echo -e "${YELLOW}STEG 2: Lytter på live trafikk på vei UT av VPN-tunnelen...$
 echo
 
 if ! command -v tcpdump &> /dev/null; then
-    echo "FEIL: 'tcpdump' er ikke installert. Installer det med:"
-    echo "sudo apt update && sudo apt install tcpdump"
+    echo "FEIL: 'tcpdump' er ikke installert. Kjør: sudo apt install tcpdump"
     exit 1
 fi
 
-if ! ip addr show nordlynx &> /dev/null; then
-    echo "FEIL: VPN-grensesnittet 'nordlynx' er nede. Sjekk at VPN er tilkoblet."
-    echo "Kjør: systemctl status nordvpn-gateway.service"
+if ! ip addr show tun0 &> /dev/null; then
+    echo "FEIL: VPN-grensesnittet 'tun0' er nede. Sjekk at VPN er tilkoblet."
+    echo "Kjør: systemctl status protonvpn-gateway.service"
     exit 1
 fi
 
-echo -e "Jeg vil nå lytte på grensesnittet ${GREEN}nordlynx${NC} etter trafikk til port 8080."
+echo -e "Jeg vil nå lytte på grensesnittet ${GREEN}tun0${NC} etter trafikk til port 8080."
 echo -e "All trafikk du ser her, går garantert gjennom VPN-tunnelen."
 echo
 echo -e "${YELLOW}*** DIN OPPGAVE NÅ: ***${NC}"
 echo "1. Gå til en av dine VPN-klienter (f.eks. 192.168.1.128)."
 echo "2. Start appen eller tjenesten som bruker port 8080."
-echo "3. Se på dette terminalvinduet. Hvis alt virker, skal du se linjer med tekst dukke opp."
+echo "3. Se på dette terminalvinduet. Hvis alt virker, skal du se trafikk her."
 echo
-echo -e "Trykk ${CYAN}Ctrl+C${NC} for å stoppe lyttingen når du er fornøyd."
+echo -e "Trykk ${CYAN}Ctrl+C${NC} for å stoppe lyttingen."
 echo -e "${CYAN}--------------------------------------------------------------${NC}"
 sleep 2
 
-# Lytter på nordlynx-grensesnittet for TCP-trafikk på port 8080
-sudo tcpdump -i nordlynx -n 'tcp and port 8080'
+sudo tcpdump -i tun0 -n 'tcp and port 8080'
 
 echo
 echo -e "${GREEN}Verifisering fullført.${NC}"
