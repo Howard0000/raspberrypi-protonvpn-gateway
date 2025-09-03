@@ -214,6 +214,9 @@ Deretter: start enhetene på nettverket ditt på nytt slik at de får de nye inn
 * Status på tjenesten: `sudo systemctl status protonvpn-gateway.service`
 * Logg: `journalctl -u protonvpn-gateway -f`
 * Sjekk ruting: `ip rule show`, `ip route show table vpn_table`
+* Installer tcpdump (kreves for verify-scriptet):  
+  ```bash
+  sudo apt install tcpdump
 
 Last ned og kjør verifiseringsskriptet for å bekrefte at selektiv ruting fungerer:
 
