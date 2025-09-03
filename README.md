@@ -32,13 +32,47 @@ Prosjektet inkluderer robust oppstart, selvreparerende logikk og overvåkning vi
 ## 🔧 Steg-for-steg-oppsett
 
 ### 0. Systemoppsett
-*(Denne seksjonen er identisk med NordVPN-prosjektet)*
+
+1.  Installer Raspberry Pi OS Lite (64-bit).
+2.  Koble til via SSH.
+3.  Oppdater systemet:
+    
+    sudo apt update && sudo apt full-upgrade -y
+    sudo reboot
+    
+4.  **Sett statisk IP-adresse:**
+    På nyere versjoner av Raspberry Pi OS brukes NetworkManager. **Tilpass IP-adresser til ditt eget nettverk.**
+
+    # Bytt ut "Wired connection 1" med navnet på din tilkobling (sjekk med 'nmcli con show')
+    # Bytt ut IP-adresser, gateway (din ruters IP) og DNS-servere
+    sudo nmcli con mod "Wired connection 1" ipv4.method manual
+    sudo nmcli con mod "Wired connection 1" ipv4.addresses 192.168.1.102/24
+    sudo nmcli con mod "Wired connection 1" ipv4.gateway 192.168.1.1
+    sudo nmcli con mod "Wired connection 1" ipv4.dns "1.1.1.1,8.8.8.8"
+    
+    # Aktiver endringene
+    sudo nmcli con up "Wired connection 1"
+    sudo reboot
 
 ### 1. Installer Pi-hole
-*(Denne seksjonen er identisk med NordVPN-prosjektet)*
 
-### 2. Aktiver IP Forwarding og `iptables-persistent`
-*(Denne seksjonen er identisk med NordVPN-prosjektet)*
+    curl -sSL https://install.pi-hole.net | bash
+
+Følg instruksjonene. Velg `eth0` som grensesnitt og velg en upstream DNS-provider (f.eks. Cloudflare). Noter ned administratorpassordet.
+
+### 2. Aktiver IP Forwarding og installer `iptables-persistent`
+
+Dette lar Pi-en videresende trafikk og sørger for at brannmurreglene overlever en omstart.
+
+    sudo apt install iptables-persistent -y
+
+Aktiver IP forwarding ved å redigere `/etc/sysctl.conf`:
+
+    sudo nano /etc/sysctl.conf
+
+Finn linjen `#net.ipv4.ip_forward=1` og fjern `#` foran. Lagre filen (Ctrl+X, Y, Enter) og aktiver endringen:
+
+    sudo sysctl -p
 
 ### 3. Installer OpenVPN og konfigurer Proton VPN
 
@@ -166,7 +200,21 @@ Disse `iptables`-reglene bruker det generiske VPN-grensesnittet `tun0`.
     sudo systemctl start protonvpn-gateway.service
 
 ### 8. Konfigurer ruteren din
-*(Denne seksjonen er identisk med NordVPN-prosjektet)*
+
+Logg inn på ruteren din og gjør følgende endringer i DHCP-innstillingene for ditt lokale nettverk:
+*   Sett **Default Gateway** til din Raspberry Pis IP (f.eks. `192.168.1.102`).
+*   Sett **DNS Server** til din Raspberry Pis IP (f.eks. `192.168.1.102`).
+
+Start enhetene på nettverket ditt på nytt for at de skal få de nye innstillingene.
+
+---
+
+## Anerkjennelser
+Prosjektet er skrevet og vedlikeholdt av @Howard0000. En KI-assistent har hjulpet til med å forenkle forklaringer, rydde i README-en og pusse på skript. Alle forslag er manuelt vurdert før de ble tatt inn, og all konfigurasjon og testing er gjort av meg.
+
+
+## 📝 Lisens
+MIT — se `LICENSE`.
 
 ---
 
