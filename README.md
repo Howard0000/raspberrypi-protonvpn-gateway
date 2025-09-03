@@ -124,3 +124,59 @@ sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 # --- STEG 7: Lagre reglene permanent ---
 sudo netfilter-persistent save
 echo "Brannmurregler er satt og lagret."
+6. Opprett hovedskriptet protonvpn-gateway.sh
+code
+Bash
+# Last ned skriptet fra det nye repoet (husk å endre linken når det er offentlig)
+sudo wget -O /usr/local/bin/protonvpn-gateway.sh https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/protonvpn-gateway.sh
+
+# Gjør det kjørbart
+sudo chmod +x /usr/local/bin/protonvpn-gateway.sh
+
+# Åpne filen for å tilpasse dine personlige variabler
+sudo nano /usr/local/bin/protonvpn-gateway.sh
+7. Opprett systemd-tjeneste
+Opprett tjenestefilen:
+code
+Bash
+sudo nano /etc/systemd/system/protonvpn-gateway.service
+Lim inn innholdet under (merk endringene):
+code
+Ini
+[Unit]
+Description=ProtonVPN Gateway Service
+After=network-online.target pihole-FTL.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/protonvpn-gateway.sh
+Restart=always
+RestartSec=30
+StandardOutput=file:/var/log/protonvpn-gateway.log
+StandardError=file:/var/log/protonvpn-gateway.log
+
+[Install]
+WantedBy=multi-user.target
+Aktiver tjenesten:
+code
+Bash
+sudo systemctl daemon-reload
+sudo systemctl enable protonvpn-gateway.service
+sudo systemctl start protonvpn-gateway.service
+8. Konfigurer ruteren din
+(Denne seksjonen er identisk med NordVPN-prosjektet)
+🔬 Testing og Verifisering
+Bruk disse kommandoene for å sjekke at alt fungerer:
+Sjekk tjenestestatus: sudo systemctl status protonvpn-gateway.service
+Se på loggen live: tail -f /var/log/protonvpn-gateway.log
+Sjekk VPN-grensesnittet: ip addr show tun0 (se etter en IP-adresse)
+Sjekk rutingregler: ip rule show og ip route show table vpn_table
+Verifiseringsskript
+code
+Bash
+# Last ned skriptet fra det nye repoet (husk å endre linken når det er offentlig)
+wget https://raw.githubusercontent.com/Howard0000/raspberrypi-protonvpn-gateway/main/verify_traffic.sh
+chmod +x verify_traffic.sh
+sudo ./verify_traffic.sh
