@@ -8,26 +8,31 @@ Dette prosjektet setter opp en Raspberry Pi som en kombinert DNS-filtreringsserv
 
 ## 🧭 Mål
 
-* Raspberry Pi med statisk IP-adresse.
-* Pi-hole for lokal DNS-blokkering på hele nettverket.
-* ProtonVPN-tilkobling for trafikk fra utvalgte enheter og/eller porter.
-* Automatisk gjenoppretting av VPN-tilkobling ved ruter-/nettverksfeil.
-* (Valgfritt) Integrasjon med Home Assistant via MQTT for overvåkning.
+- Raspberry Pi med statisk IP-adresse.
+- Pi-hole for lokal DNS-blokkering på hele nettverket.
+- ProtonVPN-tilkobling via OpenVPN for trafikk fra utvalgte enheter og/eller porter.
+- Automatisk gjenoppretting av VPN-tilkobling ved ruter-/nettverksfeil.
+- (Valgfritt) Integrasjon med Home Assistant via MQTT for overvåkning.
 
 ---
 
 ## 📦 Krav
 
-* Raspberry Pi 3, 4 eller 5 (kablet nettverk er sterkt anbefalt).
-* Raspberry Pi OS Lite (64-bit), Bookworm eller nyere.
-* ProtonVPN-konto.
-* MQTT-broker (valgfritt, kun for Home Assistant-integrasjon).
+- Raspberry Pi 3, 4 eller 5 (kablet nettverk er sterkt anbefalt).
+- Raspberry Pi OS Lite (64-bit), Bookworm eller nyere.
+- ProtonVPN-konto.
+- MQTT-broker (valgfritt, kun for Home Assistant-integrasjon).
+
+---
+
+## ⚠️ Viktig før du starter
+- **IPv6**: Oppsettet er IPv4-basert. Hvis du har IPv6 aktivt i nettverket ditt, kan trafikk lekke utenom VPN. Slå av IPv6 på Pi og klientene dine, eller legg til tilsvarende IPv6-regler.  
+- **CORRECT_GATEWAY**: I `protonvpn-gateway.sh` må du sette variabelen `CORRECT_GATEWAY` til IP-adressen til din egen ruter (f.eks. `192.168.1.1`).  
+- **CPU-temp**: Publisering av CPU-temperatur til MQTT er **av som standard** (`ENABLE_CPU_TEMP=false`). Skru på om du vil bruke den.
 
 ---
 
 ## 🔧 Steg-for-steg-oppsett
-
-### 0. Systemoppsett
 
 1. Installer Raspberry Pi OS Lite (64-bit).
 2. Koble til via SSH.
@@ -240,17 +245,16 @@ sudo ./verify_traffic.sh
 
 ## 💾 Backup og Vedlikehold
 
-* Ta backup av: `/etc/iptables/rules.v4`, `protonvpn-gateway.sh`, og systemd-unit-filen.
-* Sett opp logrotate om du bruker fil-logging.
+- Ta backup av: `/etc/iptables/rules.v4`, `protonvpn-gateway.sh`, og systemd-unit-filen.
+- Hvis du bruker fil-logging (`/var/log/protonvpn-gateway.log` og `/var/log/openvpn.log`), anbefales å sette opp `logrotate` slik at loggene ikke vokser uendelig.
 
 ---
 
 ## 📡 MQTT og Home Assistant
 
-MQTT er **av** som standard (`MQTT_ENABLED=false`).
-Sett til `true` og fyll inn broker/bruker/passord i `protonvpn-gateway.sh` for å aktivere.
-
-Scriptet støtter Home Assistant discovery for status, last\_seen og CPU-temp-sensor.
+MQTT er **av** som standard (`MQTT_ENABLED=false`).  
+Sett til `true` og fyll inn broker/bruker/passord i `protonvpn-gateway.sh` for å aktivere.  
+CPU-temperatur-sensor (`ENABLE_CPU_TEMP`) er også av som standard.
 
 ---
 
