@@ -8,20 +8,27 @@ This project sets up a Raspberry Pi as a combined DNS filtering server (Pi-hole)
 
 ## 🧭 Goals
 
-* Raspberry Pi with static IP address.
-* Pi-hole for local DNS blocking on the entire network.
-* ProtonVPN connection for traffic from selected devices and/or ports.
-* Automatic recovery of VPN connection in case of router/network failure.
-* (Optional) Integration with Home Assistant via MQTT for monitoring.
+- Raspberry Pi with static IP address.
+- Pi-hole for local DNS blocking on the whole network.
+- ProtonVPN connection via OpenVPN for traffic from selected clients and/or ports.
+- Automatic recovery of the VPN connection in case of router/network failure.
+- (Optional) Integration with Home Assistant via MQTT for monitoring.
 
 ---
 
 ## 📦 Requirements
 
-* Raspberry Pi 3, 4 or 5 (wired network strongly recommended).
-* Raspberry Pi OS Lite (64-bit), Bookworm or newer.
-* ProtonVPN account.
-* MQTT broker (optional, only for Home Assistant integration).
+- Raspberry Pi 3, 4 or 5 (wired connection strongly recommended).
+- Raspberry Pi OS Lite (64-bit), Bookworm or newer.
+- ProtonVPN account.
+- MQTT broker (optional, only for Home Assistant integration).
+
+---
+
+## ⚠️ Important before you start
+- **IPv6**: The setup is IPv4-based. If IPv6 is enabled in your network, traffic may bypass the VPN. Either disable IPv6 on the Pi and clients, or add equivalent IPv6 firewall rules.  
+- **CORRECT_GATEWAY**: In `protonvpn-gateway.sh`, set the variable `CORRECT_GATEWAY` to the IP of your router (e.g. `192.168.1.1`).  
+- **CPU-temp**: Publishing CPU temperature to MQTT is **disabled by default** (`ENABLE_CPU_TEMP=false`). Enable it if you want to use it.
 
 ---
 
@@ -243,23 +250,22 @@ Then restart the devices on your network so they get the new settings.
 
 ## 💾 Backup and Maintenance
 
-* Backup: `/etc/iptables/rules.v4`, `protonvpn-gateway.sh`, and the systemd unit file.
-* Set up logrotate if you use file logging.
+- Backup: `/etc/iptables/rules.v4`, `protonvpn-gateway.sh`, and the systemd unit file.
+- If you use file logging (`/var/log/protonvpn-gateway.log` and `/var/log/openvpn.log`), set up `logrotate` to prevent logs from growing indefinitely.
 
 ---
 
 ## 📡 MQTT and Home Assistant
 
-MQTT is **off** by default (`MQTT_ENABLED=false`).
-Set to `true` and fill in broker/user/password in `protonvpn-gateway.sh` to enable.
-
-The script supports Home Assistant discovery for status, last\_seen and CPU temperature sensors.
+MQTT is **off** by default (`MQTT_ENABLED=false`).  
+Set to `true` and fill in broker/user/password in `protonvpn-gateway.sh` to enable.  
+CPU temperature sensor (`ENABLE_CPU_TEMP`) is also off by default.
 
 ---
 
 ## 🙌 Acknowledgements
 
-Project written and maintained by @Howard0000. An AI assistant has helped simplify explanations, tidy up the README, and polish the scripts. All suggestions were manually reviewed before inclusion, and all configuration and testing were done by me.
+Project written and maintained by @Howard0000. A KI assistant helped simplify explanations, tidy the README, and polish scripts. All suggestions were manually reviewed before inclusion, and all configuration and testing was done by me.
 
 ---
 
